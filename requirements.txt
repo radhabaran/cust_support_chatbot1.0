@@ -1,6 +1,8 @@
+typing-extensions
+
 # LangChain Ecosystem
 
-langchain>=0.0.300
+langchain
 langchain_openai
 langchain-anthropic
 langchain-community
@@ -15,19 +17,19 @@ faiss-cpu
 pysqlite3-binary
 
 # OpenAI
-openai==0.27.10
-tiktoken>=0.5.2
+openai
+tiktoken
 
 # UI Framework
+IPython
 gradio==4.44.1
 setuptools>=65.5.1
 
 # Data Processing & Utils
-numpy==1.26.2
-pandas==2.1.3
-python-dotenv==1.0.0
+numpy
+pandas
+python-dotenv
 
 # Core Dependencies
 #pydantic==2.5.2
-typing-extensions==4.8.0
-requests==2.31.0
+requests
