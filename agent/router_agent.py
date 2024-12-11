@@ -1,7 +1,6 @@
 # router_agent.py
 from typing import Dict
 import logging
-from datetime import datetime
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, AIMessage
 import os
@@ -11,29 +10,51 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize LLM
-llm = ChatAnthropic(model=os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307"))
+# Load environment variables
 load_dotenv()
+
+anthro_api_key = os.environ['ANTHRO_KEY']           
+os.environ['ANTHROPIC_API_KEY'] = anthro_api_key
+
+# Initialize LLM
+# llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+llm = ChatAnthropic(model="claude-3-haiku-20240307")
+
 
 class RouterResponse:
     PRODUCT_REVIEW = "product_review"
     GENERIC = "generic"
 
 
-def should_process_product_review(state: Dict) -> bool:
-    """Determine if query should be routed to product review handler"""
-    return state.get("router_response") == RouterResponse.PRODUCT_REVIEW
+# def should_process_product_review(state: Dict) -> bool:
+#     """Determine if query should be routed to product review handler"""
+#     return state.get("router_response") == RouterResponse.PRODUCT_REVIEW
 
 
-def should_process_generic(state: Dict) -> bool:
-    """Determine if query should be routed to generic handler"""
-    return state.get("router_response") == RouterResponse.GENERIC
+# def should_process_generic(state: Dict) -> bool:
+#     """Determine if query should be routed to generic handler"""
+#     return state.get("router_response") == RouterResponse.GENERIC
 
 
-def planning_route_query(message: str, thread_id: str) -> str:
+def extract_current_message(state: Dict) -> str:
+    """Extract the current message from state"""
+    if "current_message" in state:
+        return state["current_message"]
+    
+    messages = state.get("messages", [])
+    if messages:
+        last_message = messages[-1]
+        if isinstance(last_message, HumanMessage):
+            return last_message.content
+    return ""
+
+
+def planning_route_query(state: Dict) -> Dict:
     """Route the query based on content analysis"""
     try:
-        logger.info(f"Planning route query for thread {thread_id}")
+        # Extract current message from state
+        current_message = extract_current_message(state)
+
         prompt = f"""Analyze the following query and determine if it's related to product review or a generic query.
         
         Product Review queries include:
@@ -54,71 +75,32 @@ def planning_route_query(message: str, thread_id: str) -> str:
         - Return policy questions
         - Company information requests
         
-        Query: {message}
+        Query: {current_message}
         
         Return ONLY 'product_review' or 'generic' as response."""
         
         messages = [HumanMessage(content=prompt)]
         response = llm.invoke(messages).content.lower().strip()
         
-        if RouterResponse.PRODUCT_REVIEW in response:
-            return RouterResponse.PRODUCT_REVIEW
-        return RouterResponse.GENERIC
+        category = RouterResponse.PRODUCT_REVIEW if RouterResponse.PRODUCT_REVIEW in response else RouterResponse.GENERIC
+        
+        # Log the routing decision
+        logger.info(f"Routed message: '{current_message[:50]}...' to category: {category}")
+
+        return {
+            "router_response": category,
+            "routing_metadata": {
+                "routing_category": category,
+                "original_message": current_message[:100]  # First 100 chars for context
+            }
+        }
     
     except Exception as e:
-        logger.error(f"Error in route_query for thread {thread_id}: {e}")
-        return RouterResponse.GENERIC
-
-
-def get_routing_metadata(thread_id: str, category: str) -> Dict:
-    """Generate metadata for the routing decision"""
-    return {
-        "thread_id": thread_id,
-        "routing_category": category,
-    }
-
-
-def validate_routing_category(category: str) -> str:
-    """Validate and normalize routing category"""
-    valid_categories = {RouterResponse.PRODUCT_REVIEW, RouterResponse.GENERIC}
-    normalized = category.lower().strip()
-    return normalized if normalized in valid_categories else RouterResponse.GENERIC
-
-
-def log_routing_decision(message: str, category: str, thread_id: str):
-    """Log routing decision with relevant context"""
-    logger.info(
-        f"Thread {thread_id} - Routed message: '{message[:50]}...' to category: {category}"
-    )
-
-
-class RouterAgent:
-    def __init__(self, llm_instance=None):
-        self.llm = llm_instance or llm
-        
-    def route_query(self, message: str, thread_id: str) -> Dict:
-        """Main routing method that orchestrates the routing process"""
-        try:
-            # Get initial routing category
-            category = planning_route_query(message, thread_id)
-            
-            # Validate category
-            category = validate_routing_category(category)
-            
-            # Generate metadata
-            metadata = get_routing_metadata(thread_id, category)
-            
-            # Log decision
-            log_routing_decision(message, category, thread_id)
-            
-            return {
-                "category": category,
-                "metadata": metadata
+        logger.error(f"Error in planning_route_query: {e}")
+        return {
+            "router_response": RouterResponse.GENERIC,
+            "routing_metadata": {
+                "routing_category": RouterResponse.GENERIC,
+                "error": str(e)
             }
-            
-        except Exception as e:
-            logger.error(f"Error in router agent for thread {thread_id}: {e}")
-            return {
-                "category": RouterResponse.GENERIC,
-                "metadata": get_routing_metadata(thread_id, RouterResponse.GENERIC)
-            }
+        }
