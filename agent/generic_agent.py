@@ -4,13 +4,18 @@ from typing import Dict
 import logging
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
-from agent.planning_agent import State
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+anthro_api_key = os.environ['ANTHRO_KEY']           
+os.environ['ANTHROPIC_API_KEY'] = anthro_api_key
+
 # Initialize LLM
-llm = ChatAnthropic(model=os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307"))
+# llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+
+# Initialize LLM
+llm = ChatAnthropic(model="claude-3-haiku-20240307")
 
 SYSTEM_PROMPT = """
         Role
@@ -52,8 +57,9 @@ SYSTEM_PROMPT = """
 system_message = SystemMessage(content=SYSTEM_PROMPT)
 
 
-def process_generic_query(state: State, thread_id: str) -> str:
+def process_generic_query(state: Dict, config: dict) -> Dict:
     """Process generic queries"""
+    thread_id = config["configurable"]["thread_id"]
     logger.info(f"Processing generic query for thread {thread_id}")
     try:
         last_message = state["messages"][-1].content
@@ -63,8 +69,13 @@ def process_generic_query(state: State, thread_id: str) -> str:
             HumanMessage(content=last_message)
         ]
         response = llm.invoke(messages)
-        return response.content
+        # Update the state instead of returning new dictionary
+        state["generic_response"] = response.content
+        
+        return state
+        # return {"generic_response": response.content}
     
     except Exception as e:
         logger.error(f"Error in process_generic_query for thread {thread_id}: {e}")
-        return "I apologize, but I encountered an error processing your query. Please try again."
+        state["generic_response"] = "I apologize, but I encountered an error processing your query. Please try again."
+        return state

@@ -1,13 +1,14 @@
 import os
-from typing import Dict, Annotated, TypedDict
+from typing import Dict, Type, Annotated, TypedDict
 import logging
 from langchain_core.messages import AIMessage
-from langgraph.graph import StateGraph, START
-from langgraph.prebuilt import MemorySaver
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.message import add_messages
-from agent.router_agent import route_query
+from agent.router_agent import planning_route_query
 from agent.generic_agent import process_generic_query
 from agent.product_review_agent import setup_product_review_agent
+from agent.composer_agent import compose_response
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,16 +34,8 @@ Example:
     Final Answer: ok
     """
 
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
 
-
-def initialize_state() -> State:
-    return {
-        "messages": []
-    }
-
-def get_product_info(state: State, config: dict) -> Dict:
+def get_product_info(state: Dict, config: dict) -> Dict:
     """Handle product-related queries using ProductReviewAgent"""
     try:
         product_agent = setup_product_review_agent()
@@ -57,58 +50,83 @@ def get_product_info(state: State, config: dict) -> Dict:
         logger.error(f"Error in get_product_info: {e}")
         return {"error": str(e)}
 
-def compose_response(state: State, config: dict) -> Dict:
-    """Compose final response based on processed information"""
+
+def prepare_response_for_composer(state: Dict, config: dict) -> str:
+    """Prepare the response data for the composer agent"""
     thread_id = config["configurable"]["thread_id"]
-    
-    logger.info(f"Composing response for thread {thread_id}")
+    logger.info(f"Preparing response for thread {thread_id}")
     
     try:
+        # Extract the response text based on query type
+        response_text = ""
         if "product_info" in state:
-            response = state["product_info"]
+            response_text = state["product_info"]
         elif "generic_response" in state:
-            response = state["generic_response"]
+            response_text = state["generic_response"]
+            print("*****response_text****", response_text)
         else:
-            response = "I apologize, but I couldn't process your request properly. Please try again."
+            response_text = "I apologize, but I couldn't process your request properly. Please try again."
         
-        return {"final_response": response}
+        # Format the response using the composer agent
+        formatted_text = compose_response(response_text)
+        
+        # Update state but return only the content for UI display
+        state["final_response"] = {
+            "role": "assistant",
+            "content": formatted_text
+        }
+        
+        return state["final_response"]["content"]
         
     except Exception as e:
-        logger.error(f"Error in compose_response: {e}")
-        return {"final_response": "I apologize, but I encountered an error. Please try again."}
+        logger.error(f"Error in prepare_response_for_composer: {e}")
+        state["final_response"] = {
+            "role": "assistant",
+            "content": "I apologize, but I encountered an error. Please try again."
+        }
+        return state["final_response"]["content"]
 
-def should_process_product_review(state: Dict) -> bool:
-    """Determine if query should be routed to product review handler"""
-    return state.get("router_response") == "product_review"
 
-def should_process_generic(state: Dict) -> bool:
-    """Determine if query should be routed to generic handler"""
-    return state.get("router_response") == "generic"
+def route_next_step(state: Dict) -> str:
+    """Route to next step based on router_response"""
+    router_response = state.get("router_response", "")
+    if router_response == "product_review":
+        return "product"
+    return "generic"
 
-def setup_agent_graph() -> tuple[StateGraph, MemorySaver]:
+
+# In the below function: StateGraph takes the State class as a parameter to:
+#       Know how to instantiate new state objects
+#       Understand the structure of the state
+#       Validate state transitions
+#       Manage state typing throughout the workflow
+
+
+def setup_agent_graph(State: Type) -> tuple[StateGraph, MemorySaver]:
     """Setup and return the agent workflow graph"""
     memory = MemorySaver()
     workflow = StateGraph(State)
     
     # Add nodes
-    workflow.add_node("route_query", route_query)
+    workflow.add_node("route_query", planning_route_query)
     workflow.add_node("get_product_info", get_product_info)
     workflow.add_node("handle_generic_query", process_generic_query)
-    workflow.add_node("compose_response", compose_response)
+    workflow.add_node("prepare_response", prepare_response_for_composer)
     
-    # Add conditional edges
+    # Add conditional edges from route_query
     workflow.add_conditional_edges(
         "route_query",
+        route_next_step,
         {
-            should_process_product_review: "get_product_info",
-            should_process_generic: "handle_generic_query"
+            "product": "get_product_info",
+            "generic": "handle_generic_query"
         }
     )
     
     # Add regular edges
-    workflow.add_edge("get_product_info", "compose_response")
-    workflow.add_edge("handle_generic_query", "compose_response")
-    workflow.add_edge("compose_response", "end")
+    workflow.add_edge("get_product_info", "prepare_response")
+    workflow.add_edge("handle_generic_query", "prepare_response")
+    workflow.add_edge("prepare_response", END)
     
     # Set entry point
     workflow.add_edge(START, "route_query")
