@@ -2,33 +2,45 @@
 
 import logging
 from typing import Dict, Union
+from langchain_core.messages import AIMessage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def compose_response(response_text: str) -> str:
+def compose_response(state: Dict, config: dict) -> Dict:
     """
     Process and enhance the final response
     
     Args:
-        response_text: String containing the response to format
+        state: Current state dictionary containing messages and response_text
+        config: Configuration dictionary
         
     Returns:
-        str: Formatted response text
+        Dict: Updated state with formatted response
     """
     try:
         logger.debug("Starting response composition")
+        response_text = state.get("response_text", "")
 
         if not response_text:
-            return "I apologize, but I couldn't find any response data to process."
-
-        # Process the response
-        return process_response(response_text)        
+            formatted_response = "I apologize, but I couldn't find any response data to process."
+        else:
+            # Process the response
+            formatted_response = process_response(response_text)
+            
+        # Update state with formatted response
+        state["final_response"] = formatted_response
+        state["messages"].append(AIMessage(content=formatted_response))
+        
+        return state
         
     except Exception as e:
         logger.error(f"Error in composition: {str(e)}")
-        return "I apologize, but I encountered an error processing the response. Please try again."
+        error_msg = "I apologize, but I encountered an error processing the response. Please try again."
+        state["final_response"] = error_msg
+        state["messages"].append(AIMessage(content=error_msg))
+        return state
 
 
 def process_response(text: str) -> str:
@@ -72,18 +84,47 @@ def format_response(text: str) -> str:
     """Apply standard formatting to the response"""
     if not text:
         return text
-        
-    sentences = [s.strip() for s in text.replace('\n', '. ').split('. ')]
     
+    # Handle different types of sentence separators
+    text = text.replace('\n', ' ')
+    
+    # Split sentences more carefully
+    sentences = []
+    current_sentence = []
+    
+    # Split by spaces first to handle word by word
+    words = text.split()
+    
+    for word in words:
+        current_sentence.append(word)
+        # Check for sentence endings
+        if word and word[-1] in ['.', '!', '?'] and len(word) > 1:
+            sentences.append(' '.join(current_sentence))
+            current_sentence = []
+    
+    # Handle any remaining text
+    if current_sentence:
+        sentences.append(' '.join(current_sentence))
+    
+    # Format each sentence
     formatted_sentences = []
     for sentence in sentences:
-        if sentence:
-            formatted = sentence[0].upper() + sentence[1:] if sentence else sentence
+        if sentence.strip():
+            # Capitalize first letter
+            formatted = sentence.strip()
+            formatted = formatted[0].upper() + formatted[1:] if formatted else formatted
+            
+            # Ensure proper ending punctuation
             if not formatted[-1] in ['.', '!', '?']:
                 formatted += '.'
+                
             formatted_sentences.append(formatted)
     
+    # Join sentences with proper spacing
     formatted = ' '.join(formatted_sentences)
-    formatted = formatted.replace('..', '.').replace('  ', ' ')
+    
+    # Clean up any double spaces or double periods
+    formatted = ' '.join(formatted.split())
+    formatted = formatted.replace('..', '.')
     
     return formatted
