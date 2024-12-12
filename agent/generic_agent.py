@@ -64,11 +64,15 @@ def process_generic_query(state: Dict, config: dict) -> Dict:
     try:
         last_message = state["messages"][-1].content
         
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=last_message)
-        ]
-        response = llm.invoke(messages)
+        # messages = [
+        #     SystemMessage(content=SYSTEM_PROMPT),
+        #     HumanMessage(content=last_message)
+        # ]
+
+        response = llm.invoke(
+            {"messages": [HumanMessage(content=last_message)]}, config
+        )
+        # response = llm.invoke(messages, config=config)
         # Update the state instead of returning new dictionary
         state["generic_response"] = response.content
         
