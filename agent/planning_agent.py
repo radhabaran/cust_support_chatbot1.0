@@ -78,8 +78,8 @@ def prepare_response_for_composer(state: Dict, config: dict) -> Dict:
         
         # Selectively update state
         state["final_response"] = composed_state.get("final_response", "")
-        if "messages" in composed_state:
-            state["messages"].extend(composed_state["messages"])
+        # if "messages" in composed_state:
+        #     state["messages"].extend(composed_state["messages"])
         
         return state
         
