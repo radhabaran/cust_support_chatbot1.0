@@ -51,7 +51,7 @@ def get_product_info(state: Dict, config: dict) -> Dict:
         return {"error": str(e)}
 
 
-def prepare_response_for_composer(state: Dict, config: dict) -> str:
+def prepare_response_for_composer(state: Dict, config: dict) -> Dict:
     """Prepare the response data for the composer agent"""
     thread_id = config["configurable"]["thread_id"]
     logger.info(f"Preparing response for thread {thread_id}")
@@ -67,24 +67,28 @@ def prepare_response_for_composer(state: Dict, config: dict) -> str:
         else:
             response_text = "I apologize, but I couldn't process your request properly. Please try again."
         
-        # Format the response using the composer agent
-        formatted_text = compose_response(response_text)
-        
-        # Update state but return only the content for UI display
-        state["final_response"] = {
-            "role": "assistant",
-            "content": formatted_text
+        # Create a temporary state for composer
+        composer_state = {
+            "messages": state["messages"],
+            "response_text": response_text
         }
+
+        # Call compose_response with state and config
+        composed_state = compose_response(composer_state, config)
         
-        return state["final_response"]["content"]
+        # Selectively update state
+        state["final_response"] = composed_state.get("final_response", "")
+        if "messages" in composed_state:
+            state["messages"].extend(composed_state["messages"])
+        
+        return state
         
     except Exception as e:
         logger.error(f"Error in prepare_response_for_composer: {e}")
-        state["final_response"] = {
-            "role": "assistant",
-            "content": "I apologize, but I encountered an error. Please try again."
-        }
-        return state["final_response"]["content"]
+        error_message = "I apologize, but I encountered an error. Please try again."
+        state["final_response"] = error_message
+        state["messages"].append(AIMessage(content=error_message))
+        return state
 
 
 def route_next_step(state: Dict) -> str:

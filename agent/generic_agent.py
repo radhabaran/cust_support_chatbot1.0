@@ -62,13 +62,18 @@ def process_generic_query(state: Dict, config: dict) -> Dict:
     thread_id = config["configurable"]["thread_id"]
     logger.info(f"Processing generic query for thread {thread_id}")
     try:
-        last_message = state["messages"][-1].content
+        # last_message = state["messages"][-1].content
         
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=last_message)
-        ]
+        # messages = [
+        #     SystemMessage(content=SYSTEM_PROMPT),
+        #     HumanMessage(content=last_message)
+        # ]
+
+        messages = [system_message] + state['messages']
+
         response = llm.invoke(messages)
+
+        
         # Update the state instead of returning new dictionary
         state["generic_response"] = response.content
         

@@ -12,36 +12,57 @@ logger = logging.getLogger(__name__)
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    session_id: NotRequired[str]
+    router_response: NotRequired[str]
     generic_response: NotRequired[str]
+    product_info: NotRequired[str]
+    final_response: NotRequired[str]
+
 
 class AgentManager:
     def __init__(self):
+        self.session_id = str(uuid.uuid4())
         self.graph, self.memory = setup_agent_graph(State)
+        logger.info(f"Initialized AgentManager with session_id: {self.session_id}")
+        self.config = {"configurable": {"thread_id": self.session_id}}
 
-    def process_query(self, query: str, history: List[Tuple[str, str]], session_id: str) -> str:
+    def process_query(self, query: str, history: List[Tuple[str, str]], session_id: str=None) -> str:
         try:
-            new_message = HumanMessage(content=query)
-            
-            state = {
-                "messages": [new_message]
+                    
+            # Create input state with just the new message
+            input_state = {
+                "messages": [HumanMessage(content=query)]
             }
+        
+            # Debug print for input state
+            print("\n\nDebug - Input State:")
+            print("Messages in state:")
+            for msg in input_state["messages"]:
+                print(f"Type: {type(msg).__name__}")
+                print(f"Content: {msg.content}")
+
+            # Langgraph will automatically merge this with existing state
+            result = self.graph.invoke(input_state, config=self.config)
             
-            config = {"configurable": {"thread_id": session_id}}
-            result = self.graph.invoke(state, config=config)
-            
+            # Debug print for result
+            print("\n\n---\n\n Debug - Result State:")
+            print(f"\n\nFinal Response: {result.get('final_response')}")
+            print(f"\n\nRouter Response: {result.get('router_response')}")
+            print("\n\nMessages in result:")
+            for msg in result.get("messages", []):
+                print(f"Type: {type(msg).__name__}")
+                print(f"Content: {msg.content}")
+
             return result["final_response"]
             
         except Exception as e:
-            logger.error(f"Error processing query: {e}")
+            logger.error(f"Error processing query in app.py : {e}")
             return f"Error: {str(e)}"
 
 
     def clear_context(self, session_id: str) -> tuple[List, str]:
         """Clear the conversation context for a session"""
         try:
-            if session_id in self.sessions:
-                del self.sessions[session_id]
-                logger.info(f"Cleared context for session {session_id}")
             return [], ""
         except Exception as e:
             logger.error(f"Error clearing context: {e}")
@@ -50,16 +71,14 @@ class AgentManager:
 
 def main():
     try:
-        load_dotenv()
-        session_id = str(uuid.uuid4())
-        
+        load_dotenv()              
         agent_manager = AgentManager()
         
-        logger.info(f"Starting Gradio app with session_id: {session_id}")
+        logger.info(f"Starting Gradio app")
         app = create_interface(
             process_query=agent_manager.process_query,
-            clear_context=agent_manager.clear_context,
-            session_id=session_id
+            agent_manager=agent_manager,
+            session_id=agent_manager.session_id
         )
         app.queue()
         app.launch(server_name="0.0.0.0", server_port=7860, share=True)

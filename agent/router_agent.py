@@ -49,9 +49,10 @@ def extract_current_message(state: Dict) -> str:
     return ""
 
 
-def planning_route_query(state: Dict) -> Dict:
+def planning_route_query(state: Dict, config: Dict) -> Dict:
     """Route the query based on content analysis"""
     try:
+        # print("Debug - Config:", config)
         # Extract current message from state
         current_message = extract_current_message(state)
 
@@ -80,7 +81,7 @@ def planning_route_query(state: Dict) -> Dict:
         Return ONLY 'product_review' or 'generic' as response."""
         
         messages = [HumanMessage(content=prompt)]
-        response = llm.invoke(messages).content.lower().strip()
+        response = llm.invoke(messages, config).content.lower().strip()
         
         category = RouterResponse.PRODUCT_REVIEW if RouterResponse.PRODUCT_REVIEW in response else RouterResponse.GENERIC
         

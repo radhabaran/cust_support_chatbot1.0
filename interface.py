@@ -1,6 +1,6 @@
 import gradio as gr
 
-def create_interface(process_query, clear_context, session_id):
+def create_interface(process_query, agent_manager, session_id):
     session_id = session_id
     print("interface.py session_id :", session_id)
     with gr.Blocks(title="AI Assistant") as demo:
@@ -28,7 +28,7 @@ def create_interface(process_query, clear_context, session_id):
 
 
         def clear_session():
-            return clear_context(session_id)
+            return agent_manager.clear_context(session_id)
 
         
         msg.submit(
