@@ -22,7 +22,9 @@ def compose_response(state: Dict, config: dict) -> Dict:
     try:
         logger.debug("Starting response composition")
         response_text = state.get("response_text", "")
-
+        print('#' * 100)
+        print('\nresponse_text received in composer agent : \n', response_text)
+        print('#' * 100)
         if not response_text:
             formatted_response = "I apologize, but I couldn't find any response data to process."
         else:
@@ -44,87 +46,35 @@ def compose_response(state: Dict, config: dict) -> Dict:
 
 
 def process_response(text: str) -> str:
-    """Process and format the response text"""
-    response_text = preprocess_response(text)
-    response_text = remove_system_artifacts(response_text)
-    response_text = format_response(response_text)
+    """Process and format the text"""
+    processed_text = remove_system_artifacts(text)
+    processed_text = format_response(processed_text)
     
-    return response_text.strip()
-
-
-def preprocess_response(text: str) -> str:
-    """Initial preprocessing of the response text"""
-    text = " ".join(text.split())
-    
-    if not text or text.lower() in ['none', 'null', '']:
-        text = "I apologize, but I don't have enough information to provide a response."
-    
-    return text
+    return processed_text.strip()
 
 
 def remove_system_artifacts(text: str) -> str:
     """Remove any system artifacts or unwanted patterns"""
-    artifacts = [
-        "Assistant:", "AI:", "Human:", "User:",
-        "System:", "Response:", "Output:",
-        "Final Answer:", "Answer:"
-    ]
-    
+    artifacts = ["Assistant:", "AI:", "Human:", "User:"]
     cleaned = text
     for artifact in artifacts:
         cleaned = cleaned.replace(artifact, "")
-    
-    cleaned = cleaned.strip('"').strip("'")
-    cleaned = "\n".join(line.strip() for line in cleaned.split("\n") if line.strip())
+    # Remove double quotes
+    cleaned = cleaned.replace('"', '').replace("'", "")  # Removes both double and single quotes
     
     return cleaned.strip()
 
 
 def format_response(text: str) -> str:
-    """Apply standard formatting to the response"""
-    if not text:
-        return text
+    """Apply standard formatting"""
+    # Add proper spacing
+    formatted = text.replace("\n\n\n", "\n\n")
     
-    # Handle different types of sentence separators
-    text = text.replace('\n', ' ')
+    # Ensure proper capitalization
+    formatted = ". ".join(s.strip().capitalize() for s in formatted.split(". "))
     
-    # Split sentences more carefully
-    sentences = []
-    current_sentence = []
-    
-    # Split by spaces first to handle word by word
-    words = text.split()
-    
-    for word in words:
-        current_sentence.append(word)
-        # Check for sentence endings
-        if word and word[-1] in ['.', '!', '?'] and len(word) > 1:
-            sentences.append(' '.join(current_sentence))
-            current_sentence = []
-    
-    # Handle any remaining text
-    if current_sentence:
-        sentences.append(' '.join(current_sentence))
-    
-    # Format each sentence
-    formatted_sentences = []
-    for sentence in sentences:
-        if sentence.strip():
-            # Capitalize first letter
-            formatted = sentence.strip()
-            formatted = formatted[0].upper() + formatted[1:] if formatted else formatted
-            
-            # Ensure proper ending punctuation
-            if not formatted[-1] in ['.', '!', '?']:
-                formatted += '.'
-                
-            formatted_sentences.append(formatted)
-    
-    # Join sentences with proper spacing
-    formatted = ' '.join(formatted_sentences)
-    
-    # Clean up any double spaces or double periods
-    formatted = ' '.join(formatted.split())
-    formatted = formatted.replace('..', '.')
-    
+    # Ensure proper ending punctuation
+    if formatted and not formatted[-1] in ['.', '!', '?']:
+        formatted += '.'
+        
     return formatted

@@ -36,28 +36,28 @@ class AgentManager:
             }
         
             # Debug print for input state
-            print('*' * 200)
+            print('*' * 100)
             print("\n\nBefore Graph Invoke: ")
             print("Messages in state:")
             for msg in input_state["messages"]:
                 print(f"Type: {type(msg).__name__}")
                 print(f"Content: {msg.content}")
-            print('*' * 200)
+            print('*' * 100)
 
             # Langgraph will automatically merge this with existing state
             result = self.graph.invoke(input_state, config=self.config)
             
             # Debug print for result
-            print('@' * 200)
+            print('@' * 100)
             print("\n\nAfter Graph Invoke: ")
             print(f"\nTotal messages in state: {len(result['messages'])}")
-            print(f"\n\nFinal Response: {result.get('final_response')}")
-            print(f"\n\nRouter Response: {result.get('router_response')}")
+            print(f"\nFinal Response: {result.get('final_response')}")
+            print(f"\nRouter Response: {result.get('router_response')}")
             print("\n\nMessages in result:")
             for msg in result.get("messages", []):
                 print(f"Type: {type(msg).__name__}")
                 print(f"Content: {msg.content}")
-            print('@' * 200)
+            print('@' * 100)
 
             return result["final_response"]
             

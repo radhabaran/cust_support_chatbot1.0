@@ -11,16 +11,29 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
 import shutil
 import warnings
+from dotenv import load_dotenv
 
 warnings.filterwarnings("ignore")
+
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
+anthro_api_key = os.environ['ANTHRO_KEY']           
+os.environ['ANTHROPIC_API_KEY'] = anthro_api_key
+
+api_key = os.environ['OA_API']           
+os.environ['OPENAI_API_KEY'] = api_key
 
 class ProductReviewAgent:
-    def __init__(self, model_name="claude-3-opus-20240229"):
+    def __init__(self, model_name="claude-3-5-sonnet-20240620"):
         self.llm = ChatAnthropic(model=model_name)
         self.embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
         self.vectorstore = None
