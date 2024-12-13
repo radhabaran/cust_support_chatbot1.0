@@ -26,7 +26,7 @@ gradio==4.44.1
 setuptools>=65.5.1
 
 # Data Processing & Utils
-numpy
+numpy<2.0.0
 pandas
 python-dotenv
 
