@@ -31,27 +31,33 @@ class AgentManager:
                     
             # Create input state with just the new message
             input_state = {
-                "messages": [HumanMessage(content=query)]
+                "messages": [HumanMessage(content=query)],
+                "session_id" : self.session_id
             }
         
             # Debug print for input state
-            print("\n\nDebug - Input State:")
+            print('*' * 200)
+            print("\n\nBefore Graph Invoke: ")
             print("Messages in state:")
             for msg in input_state["messages"]:
                 print(f"Type: {type(msg).__name__}")
                 print(f"Content: {msg.content}")
+            print('*' * 200)
 
             # Langgraph will automatically merge this with existing state
             result = self.graph.invoke(input_state, config=self.config)
             
             # Debug print for result
-            print("\n\n---\n\n Debug - Result State:")
+            print('@' * 200)
+            print("\n\nAfter Graph Invoke: ")
+            print(f"\nTotal messages in state: {len(result['messages'])}")
             print(f"\n\nFinal Response: {result.get('final_response')}")
             print(f"\n\nRouter Response: {result.get('router_response')}")
             print("\n\nMessages in result:")
             for msg in result.get("messages", []):
                 print(f"Type: {type(msg).__name__}")
                 print(f"Content: {msg.content}")
+            print('@' * 200)
 
             return result["final_response"]
             
